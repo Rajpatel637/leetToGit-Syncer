@@ -215,9 +215,8 @@ class LeetCodeClient:
         """
         Fetch the actual solution code for a given submission ID.
 
-        LeetCode does not expose code via a JSON endpoint — it embeds it in
-        the HTML of the submission detail page inside a JavaScript variable
-        called ``submissionCode``. This method scrapes that variable.
+        Uses the official LeetCode GraphQL endpoint to securely fetch the
+        submission details, avoiding the 403 Cloudflare blocks on the HTML pages.
 
         Args:
             submission_id: The numeric submission ID as a string.
@@ -225,28 +224,25 @@ class LeetCodeClient:
         Returns:
             The decoded source code string, or None if it could not be found.
         """
-        url = SUBMISSION_DETAIL_URL.format(submission_id)
+        query = """
+        query submissionDetails($submissionId: Int!) {
+          submissionDetails(submissionId: $submissionId) {
+            code
+          }
+        }
+        """
         try:
-            resp = self.session.get(url, timeout=15)
-            resp.raise_for_status()
-
-            # LeetCode embeds the code in a JS variable: submissionCode : '...',
-            match = re.search(
-                r"submissionCode\s*:\s*'(.*?)',\s*\n",
-                resp.text,
-                re.DOTALL,
-            )
+            data = self._graphql(query, {"submissionId": int(submission_id)})
             time.sleep(self.delay)
 
-            if not match:
+            if data is None:
                 return None
 
-            code = match.group(1)
-            # Decode unicode escape sequences (e.g. \u003c → <)
-            code = code.encode("utf-8").decode("unicode_escape")
-            # Unescape single quotes that LeetCode escapes as \'
-            code = code.replace("\\'", "'")
-            return code
+            details = data.get("submissionDetails")
+            if not details or not details.get("code"):
+                return None
+
+            return details["code"]
 
         except Exception as e:
             print(f"  [warn] Could not fetch code for submission {submission_id}: {e}")
