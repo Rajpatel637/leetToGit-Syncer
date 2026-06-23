@@ -59,14 +59,6 @@ function padId(id) {
 export function htmlToMarkdown(html) {
   if (!html) return "_No description available._";
 
-  // First pass: run through DOMParser so the browser normalises any exotic
-  // HTML (e.g. attributes containing '>') before our regex transforms run.
-  // Falls back silently to raw string if DOMParser is unavailable.
-  try {
-    const doc = new DOMParser().parseFromString(html, "text/html");
-    html = doc.body.innerHTML;
-  } catch (_) { /* fall through */ }
-
   let md = html;
 
   // Code blocks

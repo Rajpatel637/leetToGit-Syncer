@@ -14,6 +14,48 @@ import { buildProblemReadme, buildSolutionFile, getExtension } from "./github_bu
 const DEBUG = false; // Set to true for local development
 function log(...args) { if (DEBUG) console.log(...args); }
 
+/**
+ * Fetch all existing problem slugs from the GitHub repository tree.
+ * Used to avoid re-syncing problems that are already on GitHub.
+ */
+export async function getExistingGitHubProblems() {
+  try {
+    const settings = await getGitHubSettings();
+    const repoUrl = `https://api.github.com/repos/${settings.repo}`;
+    const headers = {
+      "Accept": "application/vnd.github.v3+json",
+      "Authorization": `Bearer ${settings.pat}`
+    };
+
+    const refResp = await fetchWithBackoff(`${repoUrl}/git/refs/heads/${settings.branch}`, { headers });
+    if (!refResp.ok) return new Set();
+    const refData = await refResp.json();
+    const latestCommitSha = refData.object.sha;
+
+    const commitResp = await fetchWithBackoff(`${repoUrl}/git/commits/${latestCommitSha}`, { headers });
+    if (!commitResp.ok) return new Set();
+    const commitData = await commitResp.json();
+    const baseTreeSha = commitData.tree.sha;
+
+    const treeResp = await fetchWithBackoff(`${repoUrl}/git/trees/${baseTreeSha}`, { headers });
+    if (!treeResp.ok) return new Set();
+    const treeData = await treeResp.json();
+
+    const existingSlugs = new Set();
+    for (const item of treeData.tree) {
+      if (item.type === "tree") {
+        // Extract the slug from folder names like "0001-two-sum" -> "two-sum"
+        const match = item.path.match(/^\d{4}-(.+)$/);
+        if (match) existingSlugs.add(match[1]);
+      }
+    }
+    return existingSlugs;
+  } catch (e) {
+    console.warn("[leetcode-syncer] Failed to fetch existing GitHub problems:", e);
+    return new Set();
+  }
+}
+
 // Safe Base64 encoding for Unicode strings (btoa fails on non-ASCII characters)
 function utf8ToBase64(str) {
   return btoa(unescape(encodeURIComponent(str)));

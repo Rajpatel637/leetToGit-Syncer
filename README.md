@@ -87,11 +87,5 @@ Your-Repo/
 
 ---
 
-## 💻 The Python CLI Tool (Alternative)
-If you prefer not to use a browser extension, this repository also includes a robust **Python CLI tool** and a GitHub Actions workflow for scheduled overnight syncing. 
-👉 **[Read the setup guide for the Python CLI here](./leetcode-syncer/README.md)**
-
----
-
 ## 🤝 Contributing
-Contributions, issues, and feature requests are welcome! If you want to improve the extension or the Python scripts, feel free to open a Pull Request.
+Contributions, issues, and feature requests are welcome! If you want to improve the extension, feel free to open a Pull Request.

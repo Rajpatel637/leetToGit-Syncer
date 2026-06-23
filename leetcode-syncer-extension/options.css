@@ -191,3 +191,8 @@ input::placeholder { color: var(--muted); }
   color: #58a6ff;
   text-decoration: none;
 }
+
+/* ── Bulk Sync ── */
+.bulk-sync-label { font-size: 13px; font-weight: 500; }
+.bulk-sync-hint { margin-top: 6px; margin-left: 22px; }
+.bulk-sync-actions { margin-top: 16px; }

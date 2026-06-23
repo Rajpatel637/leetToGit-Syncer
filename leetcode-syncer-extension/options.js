@@ -200,7 +200,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   btnBulkSync.addEventListener("click", async () => {
     btnBulkSync.disabled = true;
     optInCheckbox.disabled = true;
-    bulkProgress.style.display = "flex";
     bulkProgress.className = "status testing visible";
     
     try {

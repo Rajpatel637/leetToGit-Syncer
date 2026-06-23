@@ -17,33 +17,42 @@ const SUBMISSIONS_API_BASE = "https://leetcode.com/api/submissions/?offset=0";
 // GraphQL Client
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function graphql(query, variables = {}) {
+async function graphql(query, variables = {}, retries = 3) {
   const auth = await getLeetCodeAuth();
   if (!auth) throw new Error("Not logged into LeetCode.");
 
-  const resp = await fetch(GRAPHQL_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-csrftoken": auth.csrfToken,
-      "Referer": "https://leetcode.com/",
-    },
-    credentials: "include", // Sends LEETCODE_SESSION automatically
-    body: JSON.stringify({ query, variables }),
-  });
+  for (let attempt = 0; attempt < retries; attempt++) {
+    const resp = await fetch(GRAPHQL_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-csrftoken": auth.csrfToken,
+        "Referer": "https://leetcode.com/",
+      },
+      credentials: "include", // Sends LEETCODE_SESSION automatically
+      body: JSON.stringify({ query, variables }),
+    });
 
-  if (!resp.ok) {
-    throw new Error(`GraphQL error: HTTP ${resp.status}`);
-  }
+    if (resp.status === 429) {
+      console.warn(`[leetcode-syncer] Rate limited (429). Retrying in 2 seconds...`);
+      await new Promise(r => setTimeout(r, 2000));
+      continue;
+    }
 
-  const payload = await resp.json();
-  if (payload.errors && payload.errors.length > 0) {
-    // Log detail at debug level only — never surface raw API error strings to the console
-    // since they can contain session-context information readable by other extensions.
-    console.debug("[leetcode-syncer] GraphQL error detail:", payload.errors[0].message);
-    throw new Error("GraphQL returned errors — check debug console for details.");
+    if (!resp.ok) {
+      throw new Error(`GraphQL error: HTTP ${resp.status}`);
+    }
+
+    const payload = await resp.json();
+    if (payload.errors && payload.errors.length > 0) {
+      // Log detail at debug level only — never surface raw API error strings to the console
+      // since they can contain session-context information readable by other extensions.
+      console.debug("[leetcode-syncer] GraphQL error detail:", payload.errors[0].message);
+      throw new Error("GraphQL returned errors — check debug console for details.");
+    }
+    return payload.data;
   }
-  return payload.data;
+  throw new Error("GraphQL failed after maximum retries due to rate limiting.");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -156,6 +165,13 @@ export async function getAllAcceptedSubmissions(progressCallback = () => {}) {
   while (true) {
     const url = `https://leetcode.com/api/submissions/?offset=${offset}&limit=${limit}&_=${Date.now()}`;
     const resp = await fetch(url, { method: "GET", credentials: "include" });
+    
+    if (resp.status === 429) {
+      console.warn(`[leetcode-syncer] Rate limited on submissions. Retrying in 2 seconds...`);
+      await new Promise(r => setTimeout(r, 2000));
+      continue;
+    }
+
     if (!resp.ok) {
       console.warn(`[leetcode-syncer] Submissions page offset ${offset} failed: HTTP ${resp.status}`);
       break;
@@ -182,8 +198,8 @@ export async function getAllAcceptedSubmissions(progressCallback = () => {}) {
 
     if (!data.has_next) break;
     offset += limit;
-    
-    // Safety delay to prevent IP ban during rapid pagination
+
+    // Safety delay to prevent Cloudflare 403 Forbidden blocks during rapid pagination
     await new Promise(r => setTimeout(r, 500));
   }
 
@@ -232,8 +248,42 @@ export async function getSubmissionAndProblemDetails(submissionId, slug) {
   const data = await graphql(query, { submissionId: numId, titleSlug: slug });
   if (!data) return null;
 
+  let codeDetails = data.submissionDetails;
+
+  // Fallback for older submissions where GraphQL returns null for submissionDetails
+  if (!codeDetails || !codeDetails.code) {
+    try {
+      const resp = await fetch(`https://leetcode.com/submissions/detail/${numId}/`, { credentials: "include" });
+      const html = await resp.text();
+      const match = html.match(/submissionCode:\s*'((?:[^'\\]|\\.)*)'/);
+      let fallbackCode = "// Code not found";
+      
+      if (match) {
+        // Decode JS string escapes from the HTML script block
+        fallbackCode = match[1]
+          .replace(/\\u([\dA-Fa-f]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+          .replace(/\\n/g, '\n')
+          .replace(/\\t/g, '\t')
+          .replace(/\\'/g, "'")
+          .replace(/\\"/g, '"')
+          .replace(/\\\\/g, '\\');
+      }
+
+      codeDetails = {
+        code: fallbackCode,
+        runtimeDisplay: null,
+        memoryDisplay: null,
+        runtimePercentile: null,
+        memoryPercentile: null
+      };
+    } catch (e) {
+      console.warn(`[leetcode-syncer] Fallback code fetch failed for ${numId}:`, e);
+      codeDetails = { code: "// Code not found" };
+    }
+  }
+
   return {
-    codeDetails: data.submissionDetails,
+    codeDetails: codeDetails,
     question: data.question
   };
 }
