@@ -11,6 +11,9 @@
 
 import { buildProblemReadme, buildSolutionFile, getExtension } from "./github_builder.js";
 
+const DEBUG = false; // Set to true for local development
+function log(...args) { if (DEBUG) console.log(...args); }
+
 // Safe Base64 encoding for Unicode strings (btoa fails on non-ASCII characters)
 function utf8ToBase64(str) {
   return btoa(unescape(encodeURIComponent(str)));
@@ -22,12 +25,13 @@ function utf8ToBase64(str) {
  * Max 3 retries: delays of ~1s, 2s, 4s.
  */
 async function fetchWithBackoff(url, options, retries = 3) {
+  retries = Math.min(retries, 5); // Hard cap: never more than 5 attempts
   let delay = 1000;
-  for (let attempt = 0; attempt <= retries; attempt++) {
+  for (let attempt = 0; attempt < retries; attempt++) {
     const resp = await fetch(url, options);
 
-    // Retry on 429 or 5xx
-    if ((resp.status === 429 || resp.status >= 500) && attempt < retries) {
+    // Retry on 429 or 5xx (but not on the last attempt)
+    if ((resp.status === 429 || resp.status >= 500) && attempt < retries - 1) {
       const retryAfter = parseInt(resp.headers.get("Retry-After") || "0", 10) * 1000;
       const waitMs = retryAfter > 0 ? retryAfter : delay;
       console.warn(`[leetcode-syncer] GitHub ${resp.status} — retrying in ${waitMs}ms (attempt ${attempt + 1}/${retries})`);
@@ -43,14 +47,26 @@ async function fetchWithBackoff(url, options, retries = 3) {
  * Get current settings from chrome.storage.local
  */
 async function getGitHubSettings() {
-  const data = await chrome.storage.local.get(["githubPat", "githubRepo", "githubBranch"]);
-  if (!data.githubPat || !data.githubRepo) {
-    throw new Error("Missing GitHub PAT or Repository in settings.");
+  const [sessionData, localData] = await Promise.all([
+    chrome.storage.session.get("githubPat").catch(() => ({})),
+    chrome.storage.local.get(["githubPat", "githubRepo", "githubBranch"]),
+  ]);
+  const pat  = sessionData.githubPat || localData.githubPat;
+  const repo = localData.githubRepo;
+
+  if (!pat || !repo) {
+    throw new Error("Missing GitHub PAT or Repository in settings. Open Settings to configure.");
   }
+
+  // Validate repo format to prevent URL injection into GitHub API calls
+  if (!/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(repo)) {
+    throw new Error("Stored GitHub repo format is invalid — please reconfigure in Settings.");
+  }
+
   return {
-    pat: data.githubPat,
-    repo: data.githubRepo,
-    branch: data.githubBranch || "main",
+    pat,
+    repo,
+    branch: localData.githubBranch || "main",
   };
 }
 
@@ -119,27 +135,36 @@ async function pushFile(path, content, commitMessage, settings) {
  * @param {Object} payload The payload assembled by sync_orchestrator.js
  */
 export async function pushToGitHub(payload) {
-  console.log(`[leetcode-syncer] 📤 Starting GitHub push for ${payload.slug}...`);
+  log(`[leetcode-syncer] 📤 Starting GitHub push for ${payload.slug}...`);
   const settings = await getGitHubSettings();
+
+  // Sanitize slug: strip anything outside a-z 0-9 hyphen to prevent path traversal.
+  // The slug also comes from LeetCode's GraphQL response (titleSlug), which is
+  // distinct from the slug validated earlier in background.js.
+  const safeSlug = (payload.slug || "").replace(/[^a-z0-9-]/g, "").slice(0, 100);
+  if (!safeSlug) throw new Error("Invalid slug in payload — aborting push.");
+
+  // Sanitize title: strip newlines (commit message injection) and backticks
+  const safeTitle = (payload.title || "Unknown").replace(/[\r\n`]/g, " ").trim();
 
   // Folder naming convention from CLI: "0001-two-sum"
   const paddedId = String(payload.questionId).padStart(4, "0");
-  const folderName = `${paddedId}-${payload.slug}`;
-  
+  const folderName = `${paddedId}-${safeSlug}`;
+
   // 1. Build and push README.md
   const readmePath = `${folderName}/README.md`;
   const readmeContent = buildProblemReadme(payload);
   await pushFile(
     readmePath,
     readmeContent,
-    `docs: sync README for ${payload.title}`,
+    `docs: sync README for ${safeTitle}`,
     settings
   );
-  console.log(`[leetcode-syncer] ✅ Pushed ${readmePath}`);
+  log(`[leetcode-syncer] ✅ Pushed ${readmePath}`);
 
   // 2. Build and push solution code
   const ext = getExtension(payload.lang);
-  const solutionPath = `${folderName}/${paddedId}-${payload.slug}.${ext}`;
+  const solutionPath = `${folderName}/${paddedId}-${safeSlug}.${ext}`;
   const solutionContent = buildSolutionFile(payload);
 
   // Build commit message exactly like: Time: 0 ms (100%), Space: 34.4 MB (14.61%) - Two Sum
@@ -151,7 +176,7 @@ export async function pushToGitHub(payload) {
   if (typeof payload.memoryPercentile === "number") {
     solCommitMsg += ` (${payload.memoryPercentile.toFixed(2)}%)`;
   }
-  solCommitMsg += ` - ${payload.title}`;
+  solCommitMsg += ` - ${safeTitle}`;
 
   await pushFile(
     solutionPath,
@@ -159,7 +184,82 @@ export async function pushToGitHub(payload) {
     solCommitMsg,
     settings
   );
-  console.log(`[leetcode-syncer] ✅ Pushed ${solutionPath}`);
+  log(`[leetcode-syncer] ✅ Pushed ${solutionPath}`);
 
-  console.log(`[leetcode-syncer] 🎉 Successfully pushed ${payload.title} to GitHub!`);
+  log(`[leetcode-syncer] 🎉 Successfully pushed ${payload.title} to GitHub!`);
+}
+
+/**
+ * Bulk push multiple files in a single atomic commit using the GitHub Trees API.
+ * This is exponentially faster than pushing files one by one.
+ * @param {Array<{path: string, content: string}>} files 
+ * @param {string} commitMessage 
+ */
+export async function pushBulkToGitHub(files, commitMessage = "Bulk sync past LeetCode submissions") {
+  if (!files || files.length === 0) return;
+  log(`[leetcode-syncer] 📤 Starting bulk push of ${files.length} files...`);
+
+  const settings = await getGitHubSettings();
+  const repoUrl = `https://api.github.com/repos/${settings.repo}`;
+  const headers = {
+    "Accept": "application/vnd.github.v3+json",
+    "Authorization": `Bearer ${settings.pat}`,
+    "Content-Type": "application/json",
+  };
+
+  // 1. Get latest commit SHA
+  const refResp = await fetchWithBackoff(`${repoUrl}/git/refs/heads/${settings.branch}`, { headers });
+  if (refResp.status === 404) {
+    throw new Error(`Branch ${settings.branch} not found in ${settings.repo}. Please initialize the repo with a README first.`);
+  }
+  if (!refResp.ok) throw new Error(`Failed to get branch ref: ${refResp.status}`);
+  const refData = await refResp.json();
+  const latestCommitSha = refData.object.sha;
+
+  // 2. Get base tree SHA
+  const commitResp = await fetchWithBackoff(`${repoUrl}/git/commits/${latestCommitSha}`, { headers });
+  if (!commitResp.ok) throw new Error(`Failed to get commit: ${commitResp.status}`);
+  const commitData = await commitResp.json();
+  const baseTreeSha = commitData.tree.sha;
+
+  // 3. Create new tree
+  const tree = files.map(file => ({
+    path: file.path,
+    mode: "100644",
+    type: "blob",
+    content: file.content
+  }));
+
+  const treeResp = await fetchWithBackoff(`${repoUrl}/git/trees`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ base_tree: baseTreeSha, tree })
+  });
+  if (!treeResp.ok) throw new Error(`Failed to create tree: ${treeResp.status}`);
+  const treeData = await treeResp.json();
+  const newTreeSha = treeData.sha;
+
+  // 4. Create new commit
+  const newCommitResp = await fetchWithBackoff(`${repoUrl}/git/commits`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      message: commitMessage,
+      tree: newTreeSha,
+      parents: [latestCommitSha]
+    })
+  });
+  if (!newCommitResp.ok) throw new Error(`Failed to create commit: ${newCommitResp.status}`);
+  const newCommitData = await newCommitResp.json();
+  const newCommitSha = newCommitData.sha;
+
+  // 5. Update branch reference
+  const updateRefResp = await fetchWithBackoff(`${repoUrl}/git/refs/heads/${settings.branch}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({ sha: newCommitSha })
+  });
+  if (!updateRefResp.ok) throw new Error(`Failed to update branch ref: ${updateRefResp.status}`);
+
+  log(`[leetcode-syncer] 🎉 Successfully pushed ${files.length} files via atomic commit!`);
 }

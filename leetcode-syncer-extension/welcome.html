@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Welcome — LeetCode → GitHub Syncer</title>
+  <link rel="stylesheet" href="options.css" />
+  <link rel="stylesheet" href="welcome.css" />
+</head>
+<body>
+<div class="page welcome-page">
+
+  <div class="header welcome-header">
+    <img src="icons/icon128.png" alt="Extension icon" class="welcome-icon" />
+  </div>
+
+  <div class="card welcome-card">
+    <h2>Welcome to LeetCode → GitHub Syncer! 🎉</h2>
+    <p>You're almost ready to automate your LeetCode portfolio. This extension runs locally in your browser and automatically pushes your Accepted solutions to a GitHub repository of your choice.</p>
+
+    <div class="steps">
+      <ol>
+        <li>Create a new repository on GitHub (e.g., <code>leetcode-solutions</code>).</li>
+        <li>Generate a fine-grained Personal Access Token scoped to that repository with <strong>Contents: Read &amp; write</strong> permissions.</li>
+        <li>Open the extension settings and paste your token and repository name.</li>
+        <li>Solve a problem on LeetCode. It will sync instantly!</li>
+      </ol>
+    </div>
+
+    <button class="btn-primary btn-large" id="btn-setup">Open Settings &amp; Setup</button>
+    
+    <div class="footer-link-container">
+      <a href="privacy_policy.html" class="footer-link">Privacy Policy</a>
+    </div>
+  </div>
+
+</div>
+<script src="welcome.js"></script>
+</body>
+</html>

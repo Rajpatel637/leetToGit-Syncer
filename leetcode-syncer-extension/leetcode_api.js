@@ -10,7 +10,8 @@
 import { getLeetCodeAuth } from "./leetcode_auth.js";
 
 const GRAPHQL_URL = "https://leetcode.com/graphql/";
-const SUBMISSIONS_API = "https://leetcode.com/api/submissions/?offset=0&limit=10";
+// Base URL without a limit param so callers can set their own limit cleanly
+const SUBMISSIONS_API_BASE = "https://leetcode.com/api/submissions/?offset=0";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GraphQL Client
@@ -37,7 +38,10 @@ async function graphql(query, variables = {}) {
 
   const payload = await resp.json();
   if (payload.errors && payload.errors.length > 0) {
-    throw new Error(`GraphQL returned errors: ${payload.errors[0].message}`);
+    // Log detail at debug level only — never surface raw API error strings to the console
+    // since they can contain session-context information readable by other extensions.
+    console.debug("[leetcode-syncer] GraphQL error detail:", payload.errors[0].message);
+    throw new Error("GraphQL returned errors — check debug console for details.");
   }
   return payload.data;
 }
@@ -75,9 +79,10 @@ export async function getQuestionDetails(slug) {
  * @returns {Promise<string|null>} The submission ID as a string, or null.
  */
 export async function getLatestAcceptedSubmissionId(slug, retries = 3) {
-  for (let attempt = 0; attempt <= retries; attempt++) {
+  retries = Math.min(retries, 5); // Hard cap: never more than 5 total attempts
+  for (let attempt = 0; attempt < retries; attempt++) {
     // Append timestamp to bust browser cache
-    const url = `${SUBMISSIONS_API.replace('limit=10', 'limit=20')}&_=${Date.now()}`;
+    const url = `${SUBMISSIONS_API_BASE}&limit=20&_=${Date.now()}`;
     const resp = await fetch(url, {
       method: "GET",
       credentials: "include",
@@ -95,7 +100,7 @@ export async function getLatestAcceptedSubmissionId(slug, retries = 3) {
       }
     }
 
-    if (attempt < retries) {
+    if (attempt < retries - 1) {
       console.warn(`[leetcode-syncer] Submission not found in REST API yet. Retrying in 2s (attempt ${attempt + 1}/${retries})...`);
       await new Promise(r => setTimeout(r, 2000));
     }
@@ -109,6 +114,12 @@ export async function getLatestAcceptedSubmissionId(slug, retries = 3) {
  * @returns {Promise<Object|null>}
  */
 export async function getSubmissionDetails(submissionId) {
+  // Validate submissionId is a safe positive integer before it enters GraphQL
+  const numId = parseInt(submissionId, 10);
+  if (!Number.isFinite(numId) || numId <= 0 || numId > Number.MAX_SAFE_INTEGER) {
+    throw new Error(`Invalid submissionId: ${submissionId}`);
+  }
+
   const query = `
     query submissionDetails($submissionId: Int!) {
       submissionDetails(submissionId: $submissionId) {
@@ -126,6 +137,103 @@ export async function getSubmissionDetails(submissionId) {
       }
     }
   `;
-  const data = await graphql(query, { submissionId: parseInt(submissionId, 10) });
+  const data = await graphql(query, { submissionId: numId });
   return data?.submissionDetails || null;
+}
+
+/**
+ * Paginates through /api/submissions/ to fetch a list of all unique accepted submissions.
+ * Submissions are returned newest-first. De-duplicates so only the latest accepted
+ * submission per problem is kept.
+ * @param {Function} [progressCallback] Optional callback fired after each page (receives current count).
+ * @returns {Promise<Array<Object>>} List of basic submission objects.
+ */
+export async function getAllAcceptedSubmissions(progressCallback = () => {}) {
+  const seen = new Map(); // slug -> submission
+  let offset = 0;
+  const limit = 20;
+
+  while (true) {
+    const url = `https://leetcode.com/api/submissions/?offset=${offset}&limit=${limit}&_=${Date.now()}`;
+    const resp = await fetch(url, { method: "GET", credentials: "include" });
+    if (!resp.ok) {
+      console.warn(`[leetcode-syncer] Submissions page offset ${offset} failed: HTTP ${resp.status}`);
+      break;
+    }
+
+    const data = await resp.json();
+    if (!data || !data.submissions_dump) break;
+
+    for (const sub of data.submissions_dump) {
+      if (sub.status_display === "Accepted" && !seen.has(sub.title_slug)) {
+        seen.set(sub.title_slug, {
+          id: String(sub.id),
+          title: sub.title,
+          slug: sub.title_slug,
+          lang: sub.lang,
+          timestamp: parseInt(sub.timestamp, 10),
+          runtime: sub.runtime,
+          memory: sub.memory
+        });
+      }
+    }
+
+    progressCallback(seen.size);
+
+    if (!data.has_next) break;
+    offset += limit;
+    
+    // Safety delay to prevent IP ban during rapid pagination
+    await new Promise(r => setTimeout(r, 500));
+  }
+
+  return Array.from(seen.values());
+}
+
+/**
+ * Fetch both the solution code and full problem metadata in a single GraphQL query.
+ * @param {string|number} submissionId 
+ * @param {string} slug 
+ * @returns {Promise<Object|null>}
+ */
+export async function getSubmissionAndProblemDetails(submissionId, slug) {
+  const numId = parseInt(submissionId, 10);
+  if (!Number.isFinite(numId) || numId <= 0 || numId > Number.MAX_SAFE_INTEGER) {
+    throw new Error(`Invalid submissionId: ${submissionId}`);
+  }
+
+  const query = `
+    query getSubmissionAndQuestion($submissionId: Int!, $titleSlug: String!) {
+      submissionDetails(submissionId: $submissionId) {
+        code
+        timestamp
+        statusCode
+        runtimeDisplay
+        runtimePercentile
+        memoryDisplay
+        memoryPercentile
+        lang {
+          name
+          verboseName
+        }
+      }
+      question(titleSlug: $titleSlug) {
+        questionId
+        title
+        titleSlug
+        difficulty
+        content
+        topicTags {
+          name
+        }
+      }
+    }
+  `;
+  const data = await graphql(query, { submissionId: numId, titleSlug: slug });
+  if (!data) return null;
+
+  return {
+    codeDetails: data.submissionDetails,
+    question: data.question
+  };
 }

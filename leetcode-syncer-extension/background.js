@@ -12,12 +12,18 @@
 import { isLoggedIntoLeetCode } from "./leetcode_auth.js";
 import { queueSync } from "./sync_orchestrator.js";
 
+const DEBUG = false; // Set to true for local development
+function log(...args) { if (DEBUG) console.log(...args); }
+
 // Catch any uncaught error in the service worker and surface it clearly
 globalThis.addEventListener("error", (event) => {
   console.error("[leetcode-syncer] 🔥 Uncaught SW error:", event.message, event.filename, event.lineno);
 });
 globalThis.addEventListener("unhandledrejection", (event) => {
-  console.error("[leetcode-syncer] 🔥 Unhandled promise rejection:", event.reason);
+  // Log only the message string — never the full reason object, which in a future
+  // code path could accidentally contain sensitive data (e.g. a token in an error).
+  const msg = event.reason instanceof Error ? event.reason.message : String(event.reason);
+  console.error("[leetcode-syncer] 🔥 Unhandled promise rejection:", msg);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -26,9 +32,10 @@ globalThis.addEventListener("unhandledrejection", (event) => {
 
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === "install") {
-    console.log("[leetcode-syncer] Installed. Open the options page to configure.");
+    log("[leetcode-syncer] Installed. Opening welcome page.");
+    chrome.tabs.create({ url: chrome.runtime.getURL("welcome.html") });
   } else if (details.reason === "update") {
-    console.log(`[leetcode-syncer] Updated to v${chrome.runtime.getManifest().version}`);
+    log(`[leetcode-syncer] Updated to v${chrome.runtime.getManifest().version}`);
   }
 });
 
@@ -58,7 +65,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
       files:  ["main_world_injector.js"],
       world:  "MAIN",
     });
-    console.debug("[leetcode-syncer] MAIN world injector injected into tab", tabId);
+    log("[leetcode-syncer] MAIN world injector injected into tab", tabId);
   } catch (err) {
     // Common causes: tab was closed, navigation happened before injection,
     // or the extension doesn't have access (should not occur given host_permission).
@@ -83,7 +90,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         files:  ["main_world_injector.js"],
         world:  "MAIN",
       }).then(() => {
-        console.debug("[leetcode-syncer] MAIN world injector injected via content script request.");
+        log("[leetcode-syncer] MAIN world injector injected via content script request.");
       }).catch((err) => {
         console.warn("[leetcode-syncer] Injection failed:", err.message);
       });
@@ -100,10 +107,28 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     // We queue it for syncing (which adds a 3s debounce).
     case "SUBMISSION_ACCEPTED": {
       const { slug } = message;
-      console.log(`[leetcode-syncer] 🎉 SUBMISSION ACCEPTED event received for: ${slug}`);
-      queueSync(slug);
-      sendResponse({ received: true });
-      return false;
+
+      // Validate the message comes from a LeetCode problem page tab
+      if (!_sender?.tab?.url?.startsWith("https://leetcode.com/problems/")) {
+        console.warn("[leetcode-syncer] Ignoring SUBMISSION_ACCEPTED from unexpected origin:", _sender?.tab?.url);
+        break;
+      }
+
+      // Validate slug is a safe string before it enters the pipeline
+      if (!slug || typeof slug !== "string" || !/^[a-z0-9-]+$/.test(slug)) {
+        console.warn("[leetcode-syncer] Ignoring SUBMISSION_ACCEPTED with invalid slug:", slug);
+        break;
+      }
+
+      if (slug) {
+        log(`[leetcode-syncer] 🎉 SUBMISSION ACCEPTED event received for: ${slug}`);
+        queueSync(slug).catch((err) => {
+          console.error("[leetcode-syncer] Error during queueSync:", err);
+        });
+        sendResponse({ received: true });
+        return false;
+      }
+      break;
     }
 
     default:

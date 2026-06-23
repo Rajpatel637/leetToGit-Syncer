@@ -59,8 +59,16 @@ function padId(id) {
 export function htmlToMarkdown(html) {
   if (!html) return "_No description available._";
 
+  // First pass: run through DOMParser so the browser normalises any exotic
+  // HTML (e.g. attributes containing '>') before our regex transforms run.
+  // Falls back silently to raw string if DOMParser is unavailable.
+  try {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    html = doc.body.innerHTML;
+  } catch (_) { /* fall through */ }
+
   let md = html;
-  
+
   // Code blocks
   md = md.replace(/<pre>([\s\S]*?)<\/pre>/g, "\n```\n$1\n```\n");
   // Inline code
@@ -159,10 +167,19 @@ export function buildSolutionFile(p) {
   const sep = `${prefix} ` + "-".repeat(57);
   const paddedId = padId(p.questionId);
 
-  const header = `${prefix} ${paddedId}. ${p.title}
-${prefix} Difficulty : ${p.difficulty}
-${prefix} Topics     : ${topics}
-${prefix} Runtime    : ${p.runtime}  |  Memory : ${p.memory}
+  // Sanitize all LeetCode-sourced fields against newline injection.
+  // A crafted newline in a title could produce extra lines that look like
+  // valid code inside the solution file.
+  const safeTitle   = (p.title      || "").replace(/[\r\n`]/g, " ").trim();
+  const safeDiff    = (p.difficulty || "").replace(/[\r\n]/g,  " ").trim();
+  const safeTopics  = topics.replace(/[\r\n]/g, " ");
+  const safeRuntime = (p.runtime    || "N/A").replace(/[\r\n]/g, " ").trim();
+  const safeMemory  = (p.memory     || "N/A").replace(/[\r\n]/g, " ").trim();
+
+  const header = `${prefix} ${paddedId}. ${safeTitle}
+${prefix} Difficulty : ${safeDiff}
+${prefix} Topics     : ${safeTopics}
+${prefix} Runtime    : ${safeRuntime}  |  Memory : ${safeMemory}
 ${prefix} Solved     : ${date}
 ${prefix} Link       : ${url}
 ${sep}

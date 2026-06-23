@@ -11,6 +11,9 @@
 import { getQuestionDetails, getLatestAcceptedSubmissionId, getSubmissionDetails } from "./leetcode_api.js";
 import { pushToGitHub } from "./github_api.js";
 
+const DEBUG = false; // Set to true for local development
+function log(...args) { if (DEBUG) console.log(...args); }
+
 // Key prefix for tracking synced slugs in chrome.storage.local
 const SYNCED_PREFIX = "synced_";
 
@@ -44,13 +47,17 @@ export async function markAsSynced(slug, submissionId) {
  * Called by the alarm handler after the 3-second debounce.
  */
 export async function executeSync(slug) {
-  console.log(`[leetcode-syncer] 🚀 Starting sync pipeline for: ${slug}`);
+  log(`[leetcode-syncer] 🚀 Starting sync pipeline for: ${slug}`);
 
   // 1. De-duplication check
   if (await isAlreadySynced(slug)) {
-    console.log(`[leetcode-syncer] ⏭️ Slug '${slug}' already synced. Skipping.`);
+    log(`[leetcode-syncer] ⏭️ Slug '${slug}' already synced. Skipping.`);
     return;
   }
+
+  // Set pending badge
+  chrome.action.setBadgeText({ text: "⏳" });
+  chrome.action.setBadgeBackgroundColor({ color: "#d29922" }); // Yellow
 
   try {
     // 2. Fetch Submission ID
@@ -58,21 +65,21 @@ export async function executeSync(slug) {
     if (!submissionId) {
       throw new Error(`Could not find latest Accepted submission for ${slug}`);
     }
-    console.log(`[leetcode-syncer] Found submission ID: ${submissionId}`);
+    log(`[leetcode-syncer] Found submission ID: ${submissionId}`);
 
     // 3. Fetch Problem Metadata
     const question = await getQuestionDetails(slug);
     if (!question) {
       throw new Error(`Could not fetch GraphQL metadata for ${slug}`);
     }
-    console.log(`[leetcode-syncer] Fetched metadata for: ${question.title}`);
+    log(`[leetcode-syncer] Fetched metadata for: ${question.title}`);
 
     // 4. Fetch Submission Details (Code, Runtime, Memory, Lang)
     const details = await getSubmissionDetails(submissionId);
     if (!details || !details.code) {
       throw new Error(`Could not fetch GraphQL submission details for ${submissionId}`);
     }
-    console.log(`[leetcode-syncer] Fetched ${details.code.length} bytes of source code.`);
+    log(`[leetcode-syncer] Fetched ${details.code.length} bytes of source code.`);
 
     // 5. Build Final Payload
     const payload = {
@@ -91,7 +98,7 @@ export async function executeSync(slug) {
       memoryPercentile: details.memoryPercentile || null,
     };
 
-    console.log("[leetcode-syncer] 🏗️ Assembled Full Payload");
+    log("[leetcode-syncer] 🏗️ Assembled Full Payload");
     
     // 6. Push to GitHub
     await pushToGitHub(payload);
@@ -99,12 +106,21 @@ export async function executeSync(slug) {
     // 7. Mark as synced locally
     await markAsSynced(slug, submissionId);
 
+    // Set success badge, clear after 5s
+    chrome.action.setBadgeText({ text: "✓" });
+    chrome.action.setBadgeBackgroundColor({ color: "#2ea043" }); // Green
+    setTimeout(() => chrome.action.setBadgeText({ text: "" }), 5000);
+
   } catch (error) {
     console.error(`[leetcode-syncer] ❌ Sync failed for ${slug}:`, error.message);
     if (error.message === "GITHUB_AUTH_FAILED") {
       console.warn("[leetcode-syncer] GitHub token expired or invalid! Update it in the extension options.");
       chrome.action.setBadgeText({ text: "!" });
-      chrome.action.setBadgeBackgroundColor({ color: "#ff0000" });
+      chrome.action.setBadgeBackgroundColor({ color: "#da3633" }); // Red
+    } else {
+      chrome.action.setBadgeText({ text: "✕" });
+      chrome.action.setBadgeBackgroundColor({ color: "#da3633" }); // Red
+      setTimeout(() => chrome.action.setBadgeText({ text: "" }), 5000);
     }
   }
 }
@@ -114,25 +130,39 @@ export async function executeSync(slug) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Queue a problem for syncing.
- * We use chrome.alarms to wait 3 seconds before executing.
- * This gives LeetCode's backend time to finalize the submission in their DB,
- * ensuring our API calls find the latest data.
+ * Queue a problem for syncing with a 3-second debounce.
+ *
+ * The slug is written to chrome.storage.local BEFORE the timeout fires so
+ * that if the service worker is evicted in the 3-second window (inherent MV3
+ * limitation), the intent is preserved and can be retried on the next SW wake.
+ *
+ * Note: chrome.alarms enforce a 1-minute minimum in published extensions, so
+ * we use setTimeout here (safe for short durations) with storage as a safety net.
  */
-export function queueSync(slug) {
-  const alarmName = `sync_${slug}`;
-  console.log(`[leetcode-syncer] ⏱️ Queuing sync for '${slug}' in 3 seconds...`);
-  
-  // Create an alarm to fire roughly 3 seconds from now.
-  // Note: chrome.alarms minimum delay is officially 1 min for non-unpacked extensions,
-  // but unpacked/testing extensions often allow shorter, or we can use setTimeout
-  // inside the service worker (though SW might sleep). We'll use setTimeout
-  // wrapped in a wake-lock (or just standard SW execution since 3s is short).
-  
-  // For a reliable 3s delay in a Service Worker, setTimeout is safe 
-  // IF it's under 5 minutes (SW lifecycle). We will use setTimeout here 
-  // rather than chrome.alarms because alarms enforce a 1 minute minimum in production.
-  setTimeout(() => {
+export async function queueSync(slug) {
+  const pendingKey = `pending_${slug}`;
+  log(`[leetcode-syncer] ⏱️ Queuing sync for '${slug}' in 3 seconds...`);
+
+  // Persist intent before the async gap — SW eviction resilience
+  await chrome.storage.local.set({ [pendingKey]: Date.now() });
+
+  setTimeout(async () => {
+    await chrome.storage.local.remove(pendingKey);
     executeSync(slug);
   }, 3000);
 }
+
+/**
+ * On browser startup, retry any pending syncs that were dropped due to SW eviction.
+ */
+chrome.runtime.onStartup.addListener(async () => {
+  const all = await chrome.storage.local.get(null);
+  for (const key of Object.keys(all)) {
+    if (key.startsWith("pending_")) {
+      const slug = key.replace("pending_", "");
+      console.warn(`[leetcode-syncer] ⚠️ Recovering dropped sync for '${slug}' from previous session.`);
+      await chrome.storage.local.remove(key);
+      executeSync(slug);
+    }
+  }
+});

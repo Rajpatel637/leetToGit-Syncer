@@ -16,7 +16,10 @@
 
 "use strict";
 
-console.log("[leetcode-syncer] ✅ Content script loaded on:", window.location.href);
+const DEBUG = false; // Set to true for local development
+function log(...args) { if (DEBUG) console.log(...args); }
+
+log("[leetcode-syncer] ✅ Content script loaded on:", window.location.href);
 
 // Track slugs we've already fired for to prevent duplicate syncs
 const _seenSlugs = new Map(); // slug → timestamp of last fire
@@ -81,7 +84,7 @@ function onAccepted() {
   const now = Date.now();
   const lastFired = _seenSlugs.get(slug) || 0;
   if (now - lastFired < DEBOUNCE_MS) {
-    console.log("[leetcode-syncer] Debounce active for", slug, "— skipping duplicate.");
+    log("[leetcode-syncer] Debounce active for", slug, "— skipping duplicate.");
     return;
   }
   _seenSlugs.set(slug, now);
@@ -89,7 +92,7 @@ function onAccepted() {
   const lang         = detectLang();
   const submissionId = detectSubmissionId();
 
-  console.log(
+  log(
     "[leetcode-syncer] 🎉 Accepted detected!",
     `slug=${slug}`,
     `lang=${lang ?? "unknown"}`,
@@ -144,15 +147,20 @@ function isAcceptedElement(el) {
   const text = el.textContent?.trim();
   if (text !== "Accepted") return false;
 
+  // Require the element to be a leaf node (no child elements) to avoid
+  // matching a container div whose full textContent happens to include "Accepted"
+  // buried among child nodes — this prevents most DOM-spoofing false positives.
+  if (el.children && el.children.length > 0) return false;
+
   const className = (el.className || "").toLowerCase();
   const dataLocator = (el.dataset?.e2eLocator || "").toLowerCase();
 
   // LeetCode uses various classes for the success state across different UI versions:
   // - "marked_as_success" (older UI)
   // - "text-green-s" or "text-green-60" or "dark-green-s" (newer Tailwind UI)
-  const isSuccessDesign = 
-    className.includes("success") || 
-    className.includes("green") || 
+  const isSuccessDesign =
+    className.includes("success") ||
+    className.includes("green") ||
     dataLocator.includes("submission-result");
 
   return isSuccessDesign;
@@ -186,22 +194,26 @@ setTimeout(() => {
   const elements = document.querySelectorAll("span, div");
   for (const el of elements) {
     if (isAcceptedElement(el)) {
-      console.log("[leetcode-syncer] Found existing Accepted result on load!");
+      log("[leetcode-syncer] Found existing Accepted result on load!");
       onAccepted();
       return;
     }
   }
 }, 1000);
 
-console.log("[leetcode-syncer] Content script active on:", window.location.pathname);
+log("[leetcode-syncer] Content script active on:", window.location.pathname);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Fallback: Listen for messages from the MAIN world injector (fetch/XHR hooks)
 // ─────────────────────────────────────────────────────────────────────────────
 
 window.addEventListener("message", (event) => {
-  // Only accept messages from our own window + injector
-  if (event.source !== window || !event.data || !event.data.__leetcodeSyncer) return;
+  // Validate the message source: must come from the same window (not an iframe)
+  if (event.source !== window) return;
+  // Validate the origin: must be LeetCode itself — prevents spoofing from other
+  // origins, malicious ads, or cross-frame attacks
+  if (event.origin !== "https://leetcode.com") return;
+  if (!event.data || !event.data.__leetcodeSyncer) return;
 
   if (event.data.type === "SUBMISSION_ACCEPTED") {
     const { slug, lang, submissionId } = event.data;
@@ -211,12 +223,12 @@ window.addEventListener("message", (event) => {
     const now = Date.now();
     const lastFired = _seenSlugs.get(slug) || 0;
     if (now - lastFired < DEBOUNCE_MS) {
-      console.log("[leetcode-syncer] Debounce active for network hook — skipping.");
+      log("[leetcode-syncer] Debounce active for network hook — skipping.");
       return;
     }
     _seenSlugs.set(slug, now);
 
-    console.log(
+    log(
       "[leetcode-syncer] 🎉 Accepted detected via Network hook!",
       `slug=${slug}`,
       `lang=${lang ?? "unknown"}`,

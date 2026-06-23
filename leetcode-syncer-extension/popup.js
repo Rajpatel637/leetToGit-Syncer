@@ -47,13 +47,18 @@ async function render() {
   const versionEl = document.getElementById("header-version");
   if (versionEl) versionEl.textContent = `v${manifest.version}`;
 
-  // Read settings
-  const data = await chrome.storage.local.get(["githubPat", "githubRepo", "githubBranch", "expiresOn"]);
-  const hasPat  = !!data.githubPat;
-  const hasRepo = !!data.githubRepo;
+  // Read settings (PAT might be in session or local depending on user preference)
+  const [sessionData, localData] = await Promise.all([
+    chrome.storage.session.get("githubPat").catch(() => ({})),
+    chrome.storage.local.get(["githubPat", "githubRepo", "githubBranch", "expiresOn"]),
+  ]);
+  const activePat = sessionData.githubPat || localData.githubPat;
+  const hasPat  = !!activePat;
+  const hasRepo = !!localData.githubRepo;
+  const data    = { ...localData }; // for expiresOn / githubRepo display below
 
   // Show status rows section once we have something to show
-  document.getElementById("status-rows").style.display = "flex";
+  document.getElementById("status-rows").classList.remove("status-rows--hidden");
 
   // ── GitHub status ──
   if (!hasPat || !hasRepo) {
@@ -67,19 +72,13 @@ async function render() {
   if (days !== null && days < 0) {
     setRow("row-github", "off", `GitHub — token expired!`);
     const warn = document.getElementById("popup-expiry-warn");
-    warn.style.display = "flex";
-    warn.style.background = "rgba(218,54,51,0.08)";
-    warn.style.color = "#ff7b72";
-    warn.style.borderBottom = "1px solid rgba(218,54,51,0.2)";
+    warn.className = "expiry-warn expiry-warn--error";
     warn.textContent = "⛔ GitHub token has expired — open Settings to renew it.";
     setBody("🔑", "Token expired.", "Open Settings and paste a new fine-grained PAT to resume syncing.");
     return;
   } else if (days !== null && days <= 14) {
     const warn = document.getElementById("popup-expiry-warn");
-    warn.style.display = "flex";
-    warn.style.background = "rgba(210,153,34,0.08)";
-    warn.style.color = "#d29922";
-    warn.style.borderBottom = "1px solid rgba(210,153,34,0.2)";
+    warn.className = "expiry-warn expiry-warn--warn";
     warn.textContent = `⚠️ GitHub token expires in ${days} day${days === 1 ? "" : "s"} — consider renewing soon.`;
   }
 
@@ -97,10 +96,10 @@ async function render() {
   const lcWarn = document.getElementById("lc-login-warn");
   if (lcLoggedIn) {
     setRow("row-leetcode", "ok", "LeetCode — logged in ✓");
-    lcWarn.style.display = "none";
+    lcWarn.classList.add("lc-login-warn--hidden");
   } else {
     setRow("row-leetcode", "off", "LeetCode — not logged in");
-    lcWarn.style.display = "block";
+    lcWarn.classList.remove("lc-login-warn--hidden");
   }
 
   // ── Body status ──

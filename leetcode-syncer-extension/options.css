@@ -1,0 +1,193 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0d1117;
+  --surface:   #161b22;
+  --border:    #30363d;
+  --text:      #e6edf3;
+  --muted:     #8b949e;
+  --accent:    #238636;
+  --accent-fg: #3fb950;
+  --danger:    #da3633;
+  --warn:      #d29922;
+  --blue:      #58a6ff;
+  --radius:    8px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ── Layout ── */
+.page {
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 32px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.header img { width: 36px; height: 36px; border-radius: 8px; }
+.header h1 { font-size: 18px; font-weight: 600; }
+.header p  { font-size: 12px; color: var(--muted); }
+
+/* ── Card ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin-bottom: 20px;
+}
+.card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 16px;
+}
+
+/* ── Form fields ── */
+.field { margin-bottom: 16px; }
+.field:last-child { margin-bottom: 0; }
+
+label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: var(--text);
+}
+label .hint {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 12px;
+  margin-left: 6px;
+}
+
+input[type="password"],
+input[type="text"],
+input[type="date"] {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  font-family: "SF Mono", "Fira Code", monospace;
+  padding: 8px 12px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+input:focus { border-color: var(--blue); }
+input::placeholder { color: var(--muted); }
+
+/* Show/hide toggle for PAT field */
+.input-row {
+  display: flex;
+  gap: 8px;
+}
+.input-row input { flex: 1; }
+.btn-toggle {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 16px;
+  padding: 0 10px;
+  cursor: pointer;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+.btn-toggle:hover { color: var(--text); }
+
+/* ── Buttons ── */
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border: 1px solid rgba(240,246,252,0.1);
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 20px;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+.btn-primary:hover:not(:disabled)  { background: #2ea043; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Status badge ── */
+.status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-top: 14px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.status.visible { opacity: 1; }
+.status.ok      { background: rgba(63,185,80,0.1);  border: 1px solid rgba(63,185,80,0.3);  color: var(--accent-fg); }
+.status.error   { background: rgba(218,54,51,0.1);  border: 1px solid rgba(218,54,51,0.3);  color: #ff7b72; }
+.status.warn    { background: rgba(210,153,34,0.1); border: 1px solid rgba(210,153,34,0.3); color: #e3b341; }
+.status.testing { background: rgba(88,166,255,0.08); border: 1px solid rgba(88,166,255,0.2); color: var(--blue); }
+
+/* ── Expiry countdown ── */
+.expiry-info {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+.expiry-info.warn  { color: var(--warn); }
+.expiry-info.error { color: var(--danger); }
+
+/* ── Actions row ── */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+.saved-note {
+  font-size: 12px;
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.saved-note.visible { opacity: 1; }
+
+/* ── CSP Fixes ── */
+.remember-container { margin-top: 12px; }
+.remember-label {
+  font-weight: normal;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+.remember-checkbox { margin-right: 8px; }
+
+.footer-link-container {
+  text-align: center;
+  margin-top: 32px;
+  font-size: 12px;
+}
+.footer-link {
+  color: #58a6ff;
+  text-decoration: none;
+}

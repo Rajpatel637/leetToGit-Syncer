@@ -1,4 +1,4 @@
-console.log("[leetcode-syncer] ✅ MAIN world injector loaded.");
+
 
 /**
  * main_world_injector.js — Runs in the MAIN world of LeetCode problem pages.
@@ -29,9 +29,21 @@ console.log("[leetcode-syncer] ✅ MAIN world injector loaded.");
 (function () {
   "use strict";
 
-  // Guard against double-injection (e.g., extension reload without page reload)
-  if (window.__leetcodeSyncerInjected) return;
-  window.__leetcodeSyncerInjected = true;
+  const DEBUG = false; // Set to true for local development
+  function log(...args) { if (DEBUG) console.log(...args); }
+
+  log("[leetcode-syncer] ✅ MAIN world injector loaded.");
+
+  // Guard against double-injection using a non-writable, non-configurable property
+  // so that page scripts cannot disable this guard by setting the flag to false.
+  const _GUARD_KEY = "__lcs_v1";
+  if (Object.prototype.hasOwnProperty.call(window, _GUARD_KEY)) return;
+  Object.defineProperty(window, _GUARD_KEY, {
+    value: true, writable: false, configurable: false, enumerable: false,
+  });
+
+  // Abort if window.fetch is already broken or not a function
+  if (typeof window.fetch !== "function") return;
 
   // ── Regex to match the submission check endpoint ──────────────────────────
   // ⚠️ Needs verification: inspect LeetCode's Network tab during a submission.
@@ -131,5 +143,5 @@ console.log("[leetcode-syncer] ✅ MAIN world injector loaded.");
     return m ? m[1] : "";
   }
 
-  console.log("[leetcode-syncer] MAIN world fetch + XHR hooks active.");
+  log("[leetcode-syncer] MAIN world fetch + XHR hooks active.");
 })();

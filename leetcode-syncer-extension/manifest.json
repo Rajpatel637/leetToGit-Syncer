@@ -1,8 +1,10 @@
 {
   "manifest_version": 3,
   "name": "LeetCode → GitHub Syncer",
-  "version": "0.8.0",
-  "description": "Instantly syncs your Accepted LeetCode solutions to a GitHub repository the moment you solve a problem.",
+  "short_name": "LC→GH Syncer",
+  "version": "1.0.0",
+  "description": "Instantly syncs your Accepted LeetCode solutions to a GitHub repository the moment you solve a problem. Zero configuration, fully automatic.",
+  "homepage_url": "https://github.com/Rajpatel637/leetToGit",
   "background": {
     "service_worker": "background.js",
     "type": "module"
@@ -30,15 +32,22 @@
     }
   ],
   "permissions": [
-    "storage",    
-    "cookies",    
-    "scripting"   
+    "storage",
+    "cookies",
+    "scripting",
+    "tabs"
   ],
   "host_permissions": [
     "https://api.github.com/*",
     "https://leetcode.com/*"
   ],
+  "web_accessible_resources": [
+    {
+      "resources": ["welcome.html", "privacy_policy.html"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "content_security_policy": {
-    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://api.github.com https://leetcode.com"
+    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://api.github.com https://leetcode.com"
   }
 }

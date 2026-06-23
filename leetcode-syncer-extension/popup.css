@@ -1,0 +1,138 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  width: 320px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #0d1117;
+  color: #e6edf3;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid #21262d;
+  background: #161b22;
+}
+.header img { width: 28px; height: 28px; border-radius: 6px; }
+.header-text h1 { font-size: 13px; font-weight: 600; color: #e6edf3; }
+.header-text p  { font-size: 10px; color: #8b949e; margin-top: 1px; }
+
+/* ── Expiry warning banner ── */
+.expiry-warn {
+  display: none;
+  align-items: center;
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 500;
+  border-bottom: 1px solid #21262d;
+  cursor: pointer;
+}
+/* Expiry banner error state (token expired) */
+.expiry-warn--error {
+  display: flex;
+  background: rgba(218,54,51,0.08);
+  color: #ff7b72;
+  border-bottom: 1px solid rgba(218,54,51,0.2);
+}
+/* Expiry banner warning state (token expiring soon) */
+.expiry-warn--warn {
+  display: flex;
+  background: rgba(210,153,34,0.08);
+  color: #d29922;
+  border-bottom: 1px solid rgba(210,153,34,0.2);
+}
+
+/* ── Status rows (GitHub + LeetCode) ── */
+.status-rows {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-bottom: 1px solid #21262d;
+}
+/* Hidden by default; JS removes this class once status is ready to display */
+.status-rows--hidden { display: none; }
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #8b949e;
+}
+.status-row .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #30363d;
+}
+.status-row.ok   .dot { background: #3fb950; box-shadow: 0 0 4px #3fb950; }
+.status-row.warn .dot { background: #d29922; }
+.status-row.off  .dot { background: #da3633; }
+.status-row span { color: #e6edf3; }
+
+/* ── Body (main message) ── */
+.body {
+  flex: 1;
+  padding: 16px 16px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  min-height: 80px;
+}
+.status-icon { font-size: 26px; line-height: 1; }
+.status-text {
+  font-size: 12px;
+  color: #8b949e;
+  line-height: 1.6;
+  max-width: 240px;
+}
+.status-text strong { color: #e6edf3; font-weight: 500; }
+
+/* ── Not logged in LeetCode banner ── */
+.lc-login-warn {
+  display: block;
+  font-size: 11px;
+  color: #ff7b72;
+  background: rgba(218,54,51,0.08);
+  border: 1px solid rgba(218,54,51,0.2);
+  border-radius: 6px;
+  padding: 7px 12px;
+  margin: 0 16px;
+  text-align: center;
+  line-height: 1.5;
+}
+/* Hidden state — JS adds this class when user is logged into LeetCode */
+.lc-login-warn--hidden { display: none; }
+
+/* ── LeetCode login link inside banner ── */
+.lc-login-warn a {
+  color: #ff7b72;
+  text-decoration: underline;
+}
+
+/* ── Footer ── */
+.footer {
+  padding: 10px 16px;
+  border-top: 1px solid #21262d;
+  display: flex;
+  justify-content: flex-end;
+}
+.btn-settings {
+  font-size: 11px;
+  color: #58a6ff;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 0;
+  transition: color 0.15s;
+}
+.btn-settings:hover { color: #79c0ff; }

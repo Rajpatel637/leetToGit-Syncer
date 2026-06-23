@@ -54,10 +54,10 @@ export async function getLeetCodeAuth() {
       return null;
     }
 
-    // Return values in memory — caller must not store these
+    // Return only the CSRF token in memory — LEETCODE_SESSION is sent automatically
+    // by the browser via credentials:"include", so its value never needs to be in JS.
     return {
-      sessionCookie: sessionCookie.value,
-      csrfToken:     csrfCookie.value,
+      csrfToken: csrfCookie.value,
     };
   } catch (err) {
     console.error("[leetcode-syncer] Error reading LeetCode cookies:", err.message);

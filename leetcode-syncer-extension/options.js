@@ -12,6 +12,11 @@
 
 "use strict";
 
+import { startBulkSync } from "./bulk_sync.js";
+
+// Module-scoped token cache — keeps PAT out of the DOM (not visible in DevTools Elements)
+let _savedToken = "";
+
 const GITHUB_API = "https://api.github.com";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -63,12 +68,21 @@ function updateExpiryInfo(isoDate) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function loadSettings() {
-  const data = await chrome.storage.local.get(["githubPat", "expiresOn", "githubRepo", "githubBranch"]);
-  if (data.githubPat) {
+  const data = await chrome.storage.local.get(["githubPat", "expiresOn", "githubRepo", "githubBranch", "rememberToken"]);
+  const sessionData = await chrome.storage.session.get("githubPat").catch(() => ({}));
+  const activePat = sessionData.githubPat || data.githubPat;
+
+  if (activePat) {
     const tokenInput = document.getElementById("field-token");
-    tokenInput.dataset.savedToken = data.githubPat;
-    tokenInput.placeholder = maskToken(data.githubPat);
+    _savedToken = activePat;
+    tokenInput.placeholder = maskToken(activePat);
   }
+
+  const rememberCheckbox = document.getElementById("field-remember");
+  if (data.rememberToken === false) {
+    rememberCheckbox.checked = false;
+  }
+
   if (data.expiresOn) {
     document.getElementById("field-expires").value = data.expiresOn;
     updateExpiryInfo(data.expiresOn);
@@ -116,13 +130,17 @@ async function handleSaveAndTest() {
   const savedNote  = document.getElementById("saved-note");
   const tokenInput = document.getElementById("field-token");
 
-  const rawToken  = tokenInput.value.trim() || tokenInput.dataset.savedToken || "";
+  const rawToken  = tokenInput.value.trim() || _savedToken || "";
   const expiresOn = document.getElementById("field-expires").value.trim();
   const repo      = document.getElementById("field-repo").value.trim();
   const branch    = document.getElementById("field-branch").value.trim() || "main";
 
   if (!rawToken) { setStatus("error", "Please paste your GitHub Personal Access Token."); return; }
-  if (!repo || !repo.includes("/")) { setStatus("error", 'Repository must be in "owner/repo-name" format.'); return; }
+  // Strict owner/repo format: only alphanumeric, hyphen, dot, underscore
+  if (!repo || !/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(repo)) {
+    setStatus("error", 'Repository must be in "owner/repo-name" format (letters, numbers, hyphens, dots only).');
+    return;
+  }
 
   btn.disabled = true;
   setStatus("testing", "Testing connection to GitHub…");
@@ -130,12 +148,20 @@ async function handleSaveAndTest() {
   const result = await validateToken(rawToken, repo);
   if (!result.ok) { setStatus("error", result.message); btn.disabled = false; return; }
 
-  // Keys MUST match github_api.js
-  await chrome.storage.local.set({ githubPat: rawToken, githubRepo: repo, githubBranch: branch, expiresOn });
+  // Save storage based on the "Remember token" checkbox
+  const remember = document.getElementById("field-remember").checked;
+  if (remember) {
+    await chrome.storage.local.set({ githubPat: rawToken, githubRepo: repo, githubBranch: branch, expiresOn, rememberToken: true });
+    await chrome.storage.session.remove("githubPat").catch(() => {});
+  } else {
+    await chrome.storage.session.set({ githubPat: rawToken }).catch(() => {});
+    await chrome.storage.local.remove("githubPat");
+    await chrome.storage.local.set({ githubRepo: repo, githubBranch: branch, expiresOn, rememberToken: false });
+  }
 
-  tokenInput.value              = "";
-  tokenInput.placeholder        = maskToken(rawToken);
-  tokenInput.dataset.savedToken = rawToken;
+  tokenInput.value       = "";
+  tokenInput.placeholder = maskToken(rawToken);
+  _savedToken            = rawToken;
 
   setStatus("ok", result.message);
   savedNote.classList.add("visible");
@@ -161,4 +187,37 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   document.getElementById("field-expires").addEventListener("change", (e) => updateExpiryInfo(e.target.value));
   document.getElementById("btn-save").addEventListener("click", handleSaveAndTest);
+
+  // Bulk Sync Wiring
+  const optInCheckbox = document.getElementById("field-sync-opt-in");
+  const btnBulkSync = document.getElementById("btn-bulk-sync");
+  const bulkProgress = document.getElementById("bulk-sync-progress");
+
+  optInCheckbox.addEventListener("change", (e) => {
+    btnBulkSync.disabled = !e.target.checked;
+  });
+
+  btnBulkSync.addEventListener("click", async () => {
+    btnBulkSync.disabled = true;
+    optInCheckbox.disabled = true;
+    bulkProgress.style.display = "flex";
+    bulkProgress.className = "status testing visible";
+    
+    try {
+      await startBulkSync((msg) => {
+        bulkProgress.textContent = msg;
+        if (msg.includes("✅")) bulkProgress.className = "status ok visible";
+        if (msg.includes("❌")) bulkProgress.className = "status error visible";
+      });
+    } catch (err) {
+      bulkProgress.textContent = "❌ " + err.message;
+      bulkProgress.className = "status error visible";
+    } finally {
+      optInCheckbox.disabled = false;
+      // Keep sync button disabled if completed successfully to prevent accidental re-runs
+      if (!bulkProgress.textContent.includes("✅")) {
+        btnBulkSync.disabled = false;
+      }
+    }
+  });
 });

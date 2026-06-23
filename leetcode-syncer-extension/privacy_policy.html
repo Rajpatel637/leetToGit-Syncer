@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — LeetCode → GitHub Syncer</title>
+  <link rel="stylesheet" href="options.css" />
+  <link rel="stylesheet" href="privacy_policy.css" />
+</head>
+<body>
+<div class="page privacy-page">
+
+  <div class="header">
+    <img src="icons/icon48.png" alt="Extension icon" />
+    <div>
+      <h1>LeetCode → GitHub Syncer</h1>
+      <p>Privacy Policy</p>
+    </div>
+  </div>
+
+  <div class="card content">
+    <h2>1. Introduction</h2>
+    <p>This extension ("LeetCode → GitHub Syncer") is an open-source, client-side-only tool designed to synchronize your LeetCode submissions directly to your GitHub repository.</p>
+
+    <h2>2. Data Collection and Usage</h2>
+    <ul>
+      <li><strong>GitHub Personal Access Token (PAT):</strong> Your PAT is stored locally in your browser to authenticate with the GitHub API. If you select the "Remember token" option, it is saved to your browser's persistent local storage. If unchecked, it is held in memory (session storage) and cleared when the browser closes. It is used exclusively to push code to the specific repository you define.</li>
+      <li><strong>LeetCode Session Cookie:</strong> The extension requires the <code>cookies</code> permission to read the <code>csrftoken</code> cookie scoped specifically to <code>leetcode.com</code>. This cookie is used strictly to authenticate GraphQL requests to LeetCode's API to fetch your submission details. No cookie value is ever stored on disk, logged to the console, or transmitted to any third party.</li>
+    </ul>
+
+    <h2>3. No Third-Party Tracking</h2>
+    <p>This extension respects your privacy:</p>
+    <ul>
+      <li>We do <strong>not</strong> collect analytics or telemetry.</li>
+      <li>We do <strong>not</strong> use remote servers or intermediate APIs. Your data travels directly between your browser, LeetCode, and GitHub.</li>
+      <li>We do <strong>not</strong> sell or share your data.</li>
+    </ul>
+
+    <h2>4. Data Deletion</h2>
+    <p>To delete all data associated with this extension, simply uninstall it from your browser or click "Clear" in the extension settings. Since no data leaves your browser, this permanently removes everything.</p>
+
+    <h2>5. Contact</h2>
+    <p>If you have any questions about this privacy policy, please open an issue on our <a href="https://github.com/Rajpatel637/leetToGit" target="_blank" class="link-highlight">GitHub repository</a>.</p>
+  </div>
+
+</div>
+</body>
+</html>

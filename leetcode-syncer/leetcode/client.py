@@ -208,66 +208,19 @@ class LeetCodeClient:
         return list(seen.values())
 
     # ------------------------------------------------------------------
-    # Part 3d: get_submission_code
+    # Part 3d: get_submission_and_problem_details
     # ------------------------------------------------------------------
 
-    def get_submission_code(self, submission_id: str) -> Optional[str]:
+    def get_submission_and_problem_details(self, submission_id: str, slug: str) -> Optional[dict]:
         """
-        Fetch the actual solution code for a given submission ID.
-
-        Uses the official LeetCode GraphQL endpoint to securely fetch the
-        submission details, avoiding the 403 Cloudflare blocks on the HTML pages.
-
-        Args:
-            submission_id: The numeric submission ID as a string.
-
-        Returns:
-            The decoded source code string, or None if it could not be found.
+        Fetch both the solution code and full problem metadata in a single GraphQL query.
+        This cuts the number of HTTP requests exactly in half.
         """
         query = """
-        query submissionDetails($submissionId: Int!) {
+        query getSubmissionAndQuestion($submissionId: Int!, $titleSlug: String!) {
           submissionDetails(submissionId: $submissionId) {
             code
           }
-        }
-        """
-        try:
-            data = self._graphql(query, {"submissionId": int(submission_id)})
-            time.sleep(self.delay)
-
-            if data is None:
-                return None
-
-            details = data.get("submissionDetails")
-            if not details or not details.get("code"):
-                return None
-
-            return details["code"]
-
-        except Exception as e:
-            print(f"  [warn] Could not fetch code for submission {submission_id}: {e}")
-            return None
-
-    # ------------------------------------------------------------------
-    # Part 3e: get_problem_details
-    # ------------------------------------------------------------------
-
-    def get_problem_details(self, slug: str) -> Optional[dict]:
-        """
-        Fetch full problem metadata from the LeetCode GraphQL API.
-
-        Retrieves the numeric problem ID, title, difficulty, HTML description,
-        and topic tags for the given problem slug.
-
-        Args:
-            slug: The URL slug of the problem, e.g. ``"two-sum"``.
-
-        Returns:
-            A dict with keys ``questionId``, ``title``, ``titleSlug``,
-            ``difficulty``, ``content``, and ``topicTags``, or None on error.
-        """
-        query = """
-        query questionDetail($titleSlug: String!) {
           question(titleSlug: $titleSlug) {
             questionId
             title
@@ -276,27 +229,27 @@ class LeetCodeClient:
             content
             topicTags {
               name
-              slug
             }
           }
         }
         """
         try:
-            data = self._graphql(query, {"titleSlug": slug})
+            data = self._graphql(query, {
+                "submissionId": int(submission_id),
+                "titleSlug": slug
+            })
             time.sleep(self.delay)
 
             if data is None:
                 return None
 
-            question = data.get("question")
-            if question is None:
-                print(f"  [warn] No question data returned for slug: {slug}")
-                return None
-
-            return question
+            return {
+                "code": data.get("submissionDetails", {}).get("code", "# Code not available"),
+                "question": data.get("question")
+            }
 
         except Exception as e:
-            print(f"  [warn] Could not fetch problem details for {slug}: {e}")
+            print(f"  [warn] Could not fetch details for {slug}: {e}")
             return None
 
     # ------------------------------------------------------------------
@@ -343,23 +296,21 @@ class LeetCodeClient:
         for i, sub in enumerate(subs, start=1):
             print(f"  [{i}/{total}] {sub.title}")
 
-            # Fetch solution code
-            code = self.get_submission_code(sub.id)
-            if code is None:
-                code = "# Code not available"
-
-            # Fetch GraphQL metadata
-            details = self.get_problem_details(sub.slug)
-            if details is None:
+            # Fetch BOTH code and metadata in ONE request!
+            result = self.get_submission_and_problem_details(sub.id, sub.slug)
+            if not result or not result.get("question"):
                 print(f"  [warn] Skipping '{sub.title}' — could not fetch problem details")
                 continue
+
+            code = result["code"]
+            details = result["question"]
 
             problem = Problem(
                 id           = int(details.get("questionId", 0)),
                 title        = details.get("title", sub.title),
                 slug         = details.get("titleSlug", sub.slug),
                 difficulty   = details.get("difficulty", "Unknown"),
-                topics       = [t["name"] for t in details.get("topicTags", [])],
+                topics       = [t.get("name", "") for t in details.get("topicTags", [])],
                 description  = details.get("content", ""),
                 solution_code= code,
                 language     = sub.language,

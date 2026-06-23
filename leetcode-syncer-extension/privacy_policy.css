@@ -1,0 +1,28 @@
+.privacy-page {
+  max-width: 800px;
+}
+
+.content {
+  line-height: 1.6;
+  color: #c9d1d9;
+}
+
+.content h2 {
+  margin-top: 24px;
+  color: #58a6ff;
+  font-size: 18px;
+}
+
+.content ul {
+  margin-left: 20px;
+  margin-bottom: 16px;
+}
+
+.content li {
+  margin-bottom: 8px;
+}
+
+.link-highlight {
+  color: #58a6ff;
+  text-decoration: none;
+}
