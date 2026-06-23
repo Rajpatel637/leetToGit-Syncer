@@ -1,7 +1,7 @@
 <div align="center">
   <img src="leetcode-syncer-extension/icons/icon128.png" alt="LeetCode to GitHub Syncer Logo" width="128" />
   <h1>LeetCode → GitHub Syncer</h1>
-  <p><strong>Automatically sync your LeetCode solutions to GitHub</strong></p>
+  <p><strong>The ultimate Chrome Extension to seamlessly sync your LeetCode progress to GitHub.</strong></p>
   
   [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
   [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](#)
@@ -9,48 +9,89 @@
 
 ---
 
-This repository contains two distinct, powerful tools to sync your LeetCode Accepted solutions directly into your GitHub repository. It perfectly organizes your solutions by problem ID, generates clean `README.md` files for each problem, and appends time/space complexity to your commits!
+**LeetCode → GitHub Syncer** is a powerful Chrome Extension that fully automates the process of saving your LeetCode solutions. It captures your code, runtime, memory usage, and the problem description, then perfectly organizes everything into your GitHub repository.
 
-You can choose between a fully automatic **Browser Extension** or a manual **Python CLI Tool**.
-
-## 🚀 1. The Browser Extension (Recommended)
-The extension runs in the background of your browser and detects the *exact second* you get an "Accepted" result on LeetCode. It automatically fetches your code, runtime, and memory metrics, and pushes it directly to your GitHub repository without any manual intervention.
-
-- **Zero-touch syncing:** Solve a problem, and it's instantly on your GitHub.
-- **No backend servers:** Runs entirely locally in your browser for maximum security.
-- **Smart commit messages:** Captures your exact runtime and memory percentiles.
-
-👉 **[Read the setup guide for the Extension here](./leetcode-syncer-extension)**
+Whether you are solving your first problem today or you already have 500+ solved problems in your history, this extension handles it all effortlessly.
 
 ---
 
-## 💻 2. The Python CLI Tool
-A robust command-line tool perfect for bulk downloading your past solutions, running scheduled backups, or syncing without installing a browser extension.
+## ✨ Key Features
 
-- **Bulk sync:** Pulls down all 50, 100, or 500 of your past accepted solutions at once.
-- **Dry-run mode:** Preview how the folders will look locally before pushing to GitHub.
-- **GitHub Actions support:** Can be scheduled to run automatically on a cron job.
+### 🚀 1-Click Bulk History Sync
+Already have hundreds of solved problems? No problem. With a single click, the extension fetches your entire LeetCode history and uploads it to GitHub in **one lightning-fast commit** using the GitHub Trees API. 
 
-👉 **[Read the setup guide for the Python CLI here](./leetcode-syncer/README.md)**
+### ⚡ Zero-Touch Live Auto-Sync
+Once installed, just use LeetCode normally. The exact second you get an "Accepted" result, the extension silently pushes your code directly to GitHub in the background.
+
+### 📝 Beautiful Markdown Generation
+It doesn't just push code! For every single problem, it automatically generates a clean `README.md` file containing the problem description, difficulty, topic tags, and your exact runtime/memory percentiles.
+
+### 🔒 100% Secure & Private
+- **No Third-Party Servers:** Everything runs entirely locally inside your browser.
+- **No Passwords:** It uses your active browser session. You never have to manually copy or expose your LeetCode session cookies.
+- **Direct to GitHub:** Your GitHub Personal Access Token is saved securely in your browser's local storage and used only to communicate directly with `api.github.com`.
 
 ---
 
-## 📂 Example Repository Structure
-Regardless of which tool you use, your target GitHub repository will be beautifully organized like this:
+## 📦 How to Install the Extension
+
+*The extension is currently loaded manually as it is in active development.*
+
+1. **Clone or Download** this repository to your local machine.
+2. Open Google Chrome and go to `chrome://extensions/`.
+3. Enable **Developer mode** using the toggle in the top right corner.
+4. Click **Load unpacked** in the top left corner.
+5. Select the `leetcode-syncer-extension` folder.
+6. The extension is now installed! Pin it to your Chrome toolbar for easy access.
+
+---
+
+## ⚙️ Setup Instructions
+
+### 1. Generate a GitHub Token
+1. Go to your [GitHub Token Settings](https://github.com/settings/tokens).
+2. Click **Generate new token (classic)**.
+3. Under **Select scopes**, check the **`repo`** box (this grants read/write access so it can push code).
+4. Generate the token and copy the value.
+
+### 2. Prepare your Repository
+Create an **empty** public or private repository on GitHub (e.g., `yourusername/leetcode-solutions`). 
+*(Tip: Check the box to "Add a README file" when creating it so the `main` branch is initialized).*
+
+### 3. Connect the Extension
+1. Click the Extension icon in Chrome and hit the **Gear Icon (Settings)**.
+2. Paste your GitHub Token.
+3. Enter your Target Repository as `owner/repo-name` (e.g., `YourUsername/leetcode-solutions`).
+4. Click **Save & Test Connection**.
+
+### 4. Sync Your History!
+If you have past solutions, tick the optional `Sync my previous questions` box on the settings page and click **Start Bulk Sync**. The extension will grab all your old solutions and push them instantly. 
+
+For all future problems, you don't need to do anything. Just solve problems on LeetCode and they will automatically sync!
+
+---
+
+## 📂 Example Repository Output
+Your GitHub repository will be beautifully organized like this:
 
 ```
 Your-Repo/
 ├── 0001-two-sum/
 │   ├── README.md       # Problem description and difficulty
-│   └── 0001-two-sum.py # Your accepted code
+│   └── 0001-two-sum.py # Your accepted code with comments
 ├── 0217-contains-duplicate/
 │   ├── README.md
 │   └── 0217-contains-duplicate.cpp
 └── ...
 ```
 
-## 🔒 Security
-Both tools use **GitHub Fine-Grained Personal Access Tokens**. Your credentials are NEVER sent to a third-party server. The extension uses `chrome.storage.local` to store your token safely, and the Python tool uses local `.env` files.
+---
+
+## 💻 The Python CLI Tool (Alternative)
+If you prefer not to use a browser extension, this repository also includes a robust **Python CLI tool** and a GitHub Actions workflow for scheduled overnight syncing. 
+👉 **[Read the setup guide for the Python CLI here](./leetcode-syncer/README.md)**
+
+---
 
 ## 🤝 Contributing
-Contributions, issues, and feature requests are welcome! Feel free to check the issues page if you want to contribute.
+Contributions, issues, and feature requests are welcome! If you want to improve the extension or the Python scripts, feel free to open a Pull Request.
