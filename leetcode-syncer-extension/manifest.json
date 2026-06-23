@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "LeetCode → GitHub Syncer",
+  "version": "0.8.0",
+  "description": "Instantly syncs your Accepted LeetCode solutions to a GitHub repository the moment you solve a problem.",
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "LeetCode → GitHub Syncer",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": ["https://leetcode.com/problems/*"],
+      "js": ["content_script.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": [
+    "storage",    
+    "cookies",    
+    "scripting"   
+  ],
+  "host_permissions": [
+    "https://api.github.com/*",
+    "https://leetcode.com/*"
+  ],
+  "content_security_policy": {
+    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://api.github.com https://leetcode.com"
+  }
+}

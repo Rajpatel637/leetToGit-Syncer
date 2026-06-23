@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LeetCode → GitHub Syncer — Settings</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --border:    #30363d;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --accent:    #238636;
+      --accent-fg: #3fb950;
+      --danger:    #da3633;
+      --warn:      #d29922;
+      --blue:      #58a6ff;
+      --radius:    8px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ── Layout ── */
+    .page {
+      max-width: 620px;
+      margin: 0 auto;
+      padding: 32px 24px 64px;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 32px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .header img { width: 36px; height: 36px; border-radius: 8px; }
+    .header h1 { font-size: 18px; font-weight: 600; }
+    .header p  { font-size: 12px; color: var(--muted); }
+
+    /* ── Card ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 16px;
+    }
+
+    /* ── Form fields ── */
+    .field { margin-bottom: 16px; }
+    .field:last-child { margin-bottom: 0; }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 6px;
+      color: var(--text);
+    }
+    label .hint {
+      font-weight: 400;
+      color: var(--muted);
+      font-size: 12px;
+      margin-left: 6px;
+    }
+
+    input[type="password"],
+    input[type="text"],
+    input[type="date"] {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 13px;
+      font-family: "SF Mono", "Fira Code", monospace;
+      padding: 8px 12px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus { border-color: var(--blue); }
+    input::placeholder { color: var(--muted); }
+
+    /* Show/hide toggle for PAT field */
+    .input-row {
+      display: flex;
+      gap: 8px;
+    }
+    .input-row input { flex: 1; }
+    .btn-toggle {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--muted);
+      font-size: 16px;
+      padding: 0 10px;
+      cursor: pointer;
+      transition: color 0.15s;
+      flex-shrink: 0;
+    }
+    .btn-toggle:hover { color: var(--text); }
+
+    /* ── Buttons ── */
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      border: 1px solid rgba(240,246,252,0.1);
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 8px 20px;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    .btn-primary:hover:not(:disabled)  { background: #2ea043; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Status badge ── */
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      margin-top: 14px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .status.visible { opacity: 1; }
+    .status.ok      { background: rgba(63,185,80,0.1);  border: 1px solid rgba(63,185,80,0.3);  color: var(--accent-fg); }
+    .status.error   { background: rgba(218,54,51,0.1);  border: 1px solid rgba(218,54,51,0.3);  color: #ff7b72; }
+    .status.warn    { background: rgba(210,153,34,0.1); border: 1px solid rgba(210,153,34,0.3); color: #e3b341; }
+    .status.testing { background: rgba(88,166,255,0.08); border: 1px solid rgba(88,166,255,0.2); color: var(--blue); }
+
+    /* ── Expiry countdown ── */
+    .expiry-info {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+    .expiry-info.warn  { color: var(--warn); }
+    .expiry-info.error { color: var(--danger); }
+
+    /* ── Actions row ── */
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 20px;
+    }
+    .saved-note {
+      font-size: 12px;
+      color: var(--muted);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .saved-note.visible { opacity: 1; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <img src="icons/icon48.png" alt="Extension icon" />
+    <div>
+      <h1>LeetCode → GitHub Syncer</h1>
+      <p>Settings &amp; token management</p>
+    </div>
+  </div>
+
+  <!-- Card 1: GitHub token -->
+  <div class="card">
+    <div class="card-title">🔑 GitHub Token</div>
+
+    <div class="field">
+      <label for="field-token">
+        Fine-grained Personal Access Token
+        <span class="hint">— scoped to one repo, Contents: Read &amp; write</span>
+      </label>
+      <div class="input-row">
+        <input
+          type="password"
+          id="field-token"
+          placeholder="github_pat_…"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button class="btn-toggle" id="btn-reveal" title="Show / hide token" aria-label="Toggle token visibility">👁</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="field-expires">
+        Token expiration date
+        <span class="hint">— set when you generated the token; used for expiry warnings</span>
+      </label>
+      <input type="date" id="field-expires" />
+      <div class="expiry-info" id="expiry-info"></div>
+    </div>
+
+    <div id="status-token" class="status" role="alert" aria-live="polite"></div>
+  </div>
+
+  <!-- Card 2: Repository settings -->
+  <div class="card">
+    <div class="card-title">📁 Repository Settings</div>
+
+    <div class="field">
+      <label for="field-repo">
+        Target repository
+        <span class="hint">— format: owner/repo-name</span>
+      </label>
+      <input
+        type="text"
+        id="field-repo"
+        placeholder="yourname/leetcode-solutions"
+        autocomplete="off"
+        spellcheck="false"
+      />
+    </div>
+
+    <div class="field">
+      <label for="field-branch">
+        Branch
+        <span class="hint">— usually main or master</span>
+      </label>
+      <input
+        type="text"
+        id="field-branch"
+        placeholder="main"
+        autocomplete="off"
+        spellcheck="false"
+      />
+    </div>
+  </div>
+
+  <!-- Save & Test -->
+  <div class="actions">
+    <button class="btn-primary" id="btn-save">Save &amp; Test Connection</button>
+    <span class="saved-note" id="saved-note">✓ Saved</span>
+  </div>
+
+</div>
+<script src="options.js"></script>
+</body>
+</html>

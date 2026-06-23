@@ -1,0 +1,29 @@
+# Python / CLI Tool
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.env
+
+# Output folders
+output/
+test_output/
+
+# OS / System files
+.DS_Store
+Thumbs.db
+
+# Editor / IDE files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Extension packaging
+*.zip
+*.crx
